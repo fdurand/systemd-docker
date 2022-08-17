@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,10 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/opts"
-	flag "github.com/docker/docker/pkg/mflag"
+	"github.com/fdurand/moby/opts"
 
-	dockerClient "github.com/fsouza/go-dockerclient"
+	dockerClient "github.com/fdurand/go-dockerclient"
 )
 
 var (
@@ -77,11 +77,11 @@ func parseContext(args []string) (*Context, error) {
 
 	flCgroups := opts.NewListOpts(nil)
 
-	flags.StringVar(&c.PidFile, []string{"p", "-pid-file"}, "", "pipe file")
-	flags.BoolVar(&c.Logs, []string{"l", "-logs"}, true, "pipe logs")
-	flags.BoolVar(&c.Notify, []string{"n", "-notify"}, false, "setup systemd notify for container")
-	flags.BoolVar(&c.Env, []string{"e", "-env"}, false, "inherit environment variable")
-	flags.Var(&flCgroups, []string{"c", "-cgroups"}, "cgroups to take ownership of or 'all' for all cgroups available")
+	flags.StringVar(&c.PidFile, "p", "", "pipe file")
+	flags.BoolVar(&c.Logs, "l", true, "pipe logs")
+	flags.BoolVar(&c.Notify, "n", false, "setup systemd notify for container")
+	flags.BoolVar(&c.Env, "e", false, "inherit environment variable")
+	flags.Var(&flCgroups, "c", "cgroups to take ownership of or 'all' for all cgroups available")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -126,7 +126,6 @@ func parseContext(args []string) (*Context, error) {
 	if !foundD {
 		newArgs = append([]string{"-d"}, newArgs...)
 	}
-
 	c.Name = name
 	c.NotifySocket = os.Getenv("NOTIFY_SOCKET")
 	c.Args = newArgs
@@ -146,11 +145,11 @@ func parseContext(args []string) (*Context, error) {
 }
 
 func lookupNamedContainer(c *Context) error {
+
 	client, err := getClient(c)
 	if err != nil {
 		return err
 	}
-
 	container, err := client.InspectContainer(c.Name)
 	if _, ok := err.(*dockerClient.NoSuchContainer); ok {
 		return nil
@@ -158,7 +157,6 @@ func lookupNamedContainer(c *Context) error {
 	if err != nil || container == nil {
 		return err
 	}
-
 	if container.State.Running {
 		c.Id = container.ID
 		c.Pid = container.State.Pid
@@ -174,7 +172,6 @@ func lookupNamedContainer(c *Context) error {
 		if err != nil {
 			return err
 		}
-
 		container, err = client.InspectContainer(c.Name)
 		if err != nil {
 			return err
@@ -257,12 +254,7 @@ func getClient(c *Context) (*dockerClient.Client, error) {
 		return c.Client, nil
 	}
 
-	endpoint := os.Getenv("DOCKER_HOST")
-	if len(endpoint) == 0 {
-		endpoint = "unix:///var/run/docker.sock"
-	}
-
-	return dockerClient.NewVersionedClient(endpoint, "1.12")
+	return dockerClient.NewClientFromEnv()
 }
 
 func getContainerPid(c *Context) (int, error) {
@@ -571,3 +563,4 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
